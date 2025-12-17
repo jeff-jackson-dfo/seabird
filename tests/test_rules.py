@@ -3,8 +3,7 @@
 """ Check the rules
 """
 
-import os
-import pkg_resources
+from importlib import resources
 import json
 import re
 import seabird
@@ -16,13 +15,23 @@ def test_load_available_rules():
     https://github.com/castelao/seabird/issues/7
     """
     rules_dir = "rules"
-    rule_files = pkg_resources.resource_listdir(seabird.__name__, rules_dir)
-    rule_files = [f for f in rule_files if re.match("^(?!refnames).*json$", f)]
+
+    # Locate the rules directory inside the seabird package
+    rules_root = resources.files(seabird).joinpath(rules_dir)
+
+    # List JSON rule files, excluding refnames.json
+    rule_files = [
+        p.name
+        for p in rules_root.iterdir()
+        if p.is_file() and re.match(r"^(?!refnames).*\.json$", p.name)
+    ]
+
     for rule_file in rule_files:
-        print("loading rule: %s", (rule_file))
-        text = pkg_resources.resource_string(
-            seabird.__name__, os.path.join(rules_dir, rule_file)
-        )
-        rule = json.loads(text.decode("utf-8"))
-        assert type(rule) == dict
-        assert len(rule.keys()) > 0
+        print(f"loading rule: {rule_file}")
+
+        # Load JSON content
+        with rules_root.joinpath(rule_file).open("r", encoding="utf-8") as f:
+            rule = json.load(f)
+
+        assert isinstance(rule, dict)
+        assert len(rule) > 0

@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 import re
-import pkg_resources
 import os
 import logging
 import struct
+from importlib import resources
 import json
 
 try:
@@ -53,7 +53,7 @@ class CNV:
         module_logger.debug("Initializing CNV class")
 
         # Clean empty lines first
-        self.raw_text = re.sub("\n\s*(?=\n)", "", raw_text)
+        self.raw_text = re.sub(r"\n\s*(?=\n)", "", raw_text)
         self.defaults = defaults
         self.attrs = {}
         # ----
@@ -163,10 +163,10 @@ class CNV:
         self.ids = []
         # ----
         rule_file = "rules/refnames.json"
-        text = pkg_resources.resource_string(__name__, rule_file)
-        refnames = json.loads(text.decode("utf-8"))
-        # ---- Parse fields
+        with resources.files(__name__).joinpath(rule_file).open("r", encoding="utf-8") as f:
+            refnames = json.load(f)
 
+        # ---- Parse fields
         if ("attributes" in self.rule) and (
             self.rule["attributes"]["instrument_type"] == "CTD-bottle"
         ):
@@ -243,7 +243,7 @@ class CNV:
           but it's not the proper way to handle it.
         """
         data_rows = re.sub(
-            "(\n\s*)+\n", "\n", re.sub("\r\n", "\n", self.raw_data()["data"])
+            r"(\n\s*)+\n", "\n", re.sub("\r\n", "\n", self.raw_data()["data"])
         ).split("\n")[:-1]
         data = ma.masked_values(
             np.array([CNV.__split_row(d) for d in data_rows], dtype=float),
@@ -441,7 +441,7 @@ class CNV:
         )
 
     def get_location(self):
-        """Extract the station location (Lat, Lon)
+        r"""Extract the station location (Lat, Lon)
 
         Sometimes the CTD unit station is not connected to the GPS, so it's
           written manually in the headerblob. In that case, I'll try to

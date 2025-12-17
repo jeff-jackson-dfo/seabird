@@ -29,7 +29,7 @@
     },
     "timeS": {
         "units": "seconds",
-        "name": "timeS"
+        "name": "time"
     },
     "c1S/m": {
         "long_name": "secondary_sea_water_electrical_conductivity",
@@ -71,6 +71,10 @@
         "name": "fluorescence"
     },
     "prDM": {
+        "long_name": "sea_water_pressure",
+        "name": "PRES"
+    },
+    "prdM": {
         "long_name": "sea_water_pressure",
         "name": "PRES"
     },

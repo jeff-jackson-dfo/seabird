@@ -1,7 +1,7 @@
 import os
 import re
+from importlib import resources
 import logging
-import pkg_resources
 import json
 
 # import codecs
@@ -69,44 +69,41 @@ def press2depth(press, latitude):
 
 
 def load_rule(raw_text):
-    """Load the adequate rules to parse the data
+    """Load the adequate rules to parse the data.
 
-    It should try all available rules, one by one, and use the one
-      which fits.
+    Tries all available CNV rules bundled with the seabird package
+    and returns the first rule that successfully parses the input.
     """
-    rules_dir = "rules"
-    rule_files = pkg_resources.resource_listdir(__name__, rules_dir)
-    rule_files = [f for f in rule_files if re.match(r"^cnv.*\.json$", f)]
-    for rule_file in rule_files:
-        text = pkg_resources.resource_string(
-            __name__, os.path.join(rules_dir, rule_file)
-        )
-        rule = json.loads(text.decode("utf-8"))
-        # Should I load using codec, for UTF8?? Do I need it?
-        # f = codecs.open(rule_file, 'r', 'utf-8')
-        # rule = yaml.load(f.read())
 
-        # Transitioning for the new rules concept for regexp.
+    try:
+        rules_root = resources.files("seabird").joinpath("rules")
+    except (ModuleNotFoundError, FileNotFoundError):
+        raise CNVError(tag="noparsingrule")
+
+    rule_files = sorted(
+        p for p in rules_root.iterdir()
+        if p.name.startswith("cnv") and p.name.endswith(".json")
+    )
+
+    for rule_path in rule_files:
+        rule = json.loads(rule_path.read_text(encoding="utf-8"))
+
+        # Build the parsing regex
         if "sep" in rule:
-            r = rule["header"] + rule["sep"] + rule["data"]
+            regex = rule["header"] + rule["sep"] + rule["data"]
         else:
-            r = (
-                "(?P<header> "
-                + rule["header"]
-                + ")"
-                + "(?P<data> (?:"
-                + rule["data"]
-                + ")+)"
+            regex = (
+                "(?P<header>" + rule["header"] + ")"
+                "(?P<data>(?:" + rule["data"] + ")+)"
             )
-        content_re = re.compile(r, re.VERBOSE)
-        if re.search(r, raw_text, re.VERBOSE):
-            # logging.debug("Using rules from: %s" % rule_file)
-            # self.rule = rule
-            parsed = content_re.search(raw_text).groupdict()
-            return rule, parsed
 
-    # If haven't returned a rule by this point, raise an exception.
-    # logging.error("No rules able to parse it")
+        content_re = re.compile(regex, re.VERBOSE)
+
+        match = content_re.search(raw_text)
+        if match:
+            return rule, match.groupdict()
+
+    # No rule matched
     raise CNVError(tag="noparsingrule")
 
 

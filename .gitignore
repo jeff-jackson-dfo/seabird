@@ -12,6 +12,7 @@ sdist
 develop-eggs
 .installed.cfg
 version.py
+seabird/version.py
 
 # Installer logs
 pip-log.txt

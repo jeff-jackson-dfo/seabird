@@ -3,6 +3,10 @@
 History
 -------
 
+0.13.x
+------
+* Converted all code using pkg_resources to code using importlib
+
 0.12.x
 ------
 
