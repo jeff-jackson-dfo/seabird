@@ -560,6 +560,37 @@ class CNV:
                         % (k, nvalues, len(self[k]))
                     )
 
+    def add_depth(self):
+        """
+        Compute depth from pressure and store it in the instance.
+        Depth is positive downward and computed using TEOS-10 (gsw).
+        """
+
+        # --- Retrieve pressure ---
+        if "pressure" in self.data:
+            p = np.asarray(self.data["pressure"])
+        elif "PRES" in self.data:
+            p = np.asarray(self.data["PRES"])
+        else:
+            raise KeyError("No pressure variable found to compute depth")
+
+        # --- Retrieve latitude ---
+        if "latitude" in self.data:
+            lat = np.asarray(self.data["latitude"])
+        elif "LATITUDE" in self.data:
+            lat = np.asarray(self.data["LATITUDE"])
+        else:
+            raise ValueError("Latitude is required to compute depth")
+
+        # --- Compute depth ---
+        z = gsw.z_from_p(p, lat)
+        depth = -z  # positive downward
+
+        # --- Store result ---
+        self.data["depth"] = depth
+
+        return self
+
 
 class fCNV(CNV):
     """The same of CNV class, but the input is a filename
