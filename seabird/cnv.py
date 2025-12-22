@@ -564,8 +564,8 @@ class CNV:
     def add_depth(
         self,
         pressure_key="pressure",
-        lat_key="LATITUDE",
-        depth_key="DEPTH",
+        lat_key="latitude",
+        depth_key="depth",
     ):
         """
         Compute depth from pressure and add it to self.data as a masked array.
