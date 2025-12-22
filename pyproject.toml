@@ -52,6 +52,7 @@ dependencies = [
   "matplotlib>=3.7.5",
   "netcdf4>=1.7.2",
   "xarray>=2023.1.0",
+  "gsw>=3.6.20",
 ]
 
 

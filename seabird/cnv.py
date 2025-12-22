@@ -5,6 +5,9 @@ import logging
 import struct
 from importlib import resources
 import json
+from numpy.lib import recfunctions as rfn
+import gsw
+
 
 try:
     import hashlib
@@ -511,7 +514,7 @@ class CNV:
     def as_DataFrame(self):
         """Return the data as a pandas.DataFrame
 
-        ATENTION, I should improve this.
+        ATTENTION, I should improve this.
         """
         try:
             import pandas as pd
@@ -533,13 +536,10 @@ class CNV:
         return output
 
     def check_consistency(self):
-        """Some consistency checks
-
-        Check if the dataset is consistent with the info from the
-          header.
-
-        Might be a good idea to move these tests outside the
-          class.
+        """
+        Some consistency checks
+        Check if the dataset is consistent with the info from the header.
+        Might be a good idea to move these tests outside the class.
         """
         if "nquan" in self.attrs:
             # Check if the number of variables is equal to nquan
@@ -560,36 +560,68 @@ class CNV:
                         % (k, nvalues, len(self[k]))
                     )
 
-    def add_depth(self):
+
+    def add_depth(
+        self,
+        pressure_key="pressure",
+        lat_key="LATITUDE",
+        depth_key="DEPTH",
+    ):
         """
-        Compute depth from pressure and store it in the instance.
-        Depth is positive downward and computed using TEOS-10 (gsw).
+        Compute depth from pressure and add it to self.data as a masked array.
+
+        Depth is computed using gsw.z_from_p and stored as positive-down values.
         """
 
-        # --- Retrieve pressure ---
-        if "pressure" in self.data:
-            p = np.asarray(self.data["pressure"])
-        elif "PRES" in self.data:
-            p = np.asarray(self.data["PRES"])
+        try:
+            import gsw
+        except ImportError as e:
+            raise ImportError("gsw is required to compute depth") from e
+
+        # --- locate pressure variable ---
+        pressure = None
+        for d in self.data:
+            if d.attrs.get("name") == pressure_key:
+                pressure = ma.asarray(d)
+                pressure_attrs = d.attrs.copy()
+                break
+
+        if pressure is None:
+            raise KeyError(f"'{pressure_key}' not found in CNV data")
+
+        # --- latitude ---
+        # Latitude is a scalar attribute, not a data column
+        if lat_key in self.attrs:
+            latitude = float(self.attrs[lat_key])
         else:
-            raise KeyError("No pressure variable found to compute depth")
+            latitude = 0.0  # Equator fallback
 
-        # --- Retrieve latitude ---
-        if "latitude" in self.data:
-            lat = np.asarray(self.data["latitude"])
-        elif "LATITUDE" in self.data:
-            lat = np.asarray(self.data["LATITUDE"])
-        else:
-            raise ValueError("Latitude is required to compute depth")
+        # --- compute depth ---
+        # gsw.z_from_p returns negative z (meters, positive up)
+        z = gsw.z_from_p(pressure, latitude)
 
-        # --- Compute depth ---
-        z = gsw.z_from_p(p, lat)
-        depth = -z  # positive downward
+        depth = ma.masked_array(
+            -z,
+            mask=ma.getmaskarray(pressure),
+            fill_value=float(self.attrs.get("bad_flag", np.nan)),
+        )
 
-        # --- Store result ---
-        self.data["depth"] = depth
+        # --- attach metadata ---
+        depth.attrs = {
+            "id": max(self.ids) + 1 if self.ids else 0,
+            "name": depth_key,
+            "longname": "Depth",
+            "units": "m",
+            "standard_name": "depth",
+            "positive": "down",
+            "derived_from": pressure_key,
+        }
 
-        return self
+        # --- store in instance ---
+        self.data.append(depth)
+        self.ids.append(depth.attrs["id"])
+
+        return depth
 
 
 class fCNV(CNV):
@@ -646,3 +678,46 @@ class fCNV(CNV):
 
     def load_defaults(self, defaultsfile):
         pass
+
+
+def main(my_string: str) -> None:
+
+    # print(my_string)
+
+    import os
+    from seabird.cnv import fCNV
+
+    root = os.getcwd()
+    # print(root)
+
+    os.chdir('C:/DFO-MPO/DEV/GitHub/castelao/CoTeDe/')
+    # print(os.getcwd())
+
+    filename = 'Dat4805179.CNV'
+
+    cnv = fCNV(filename)
+
+    # print(cnv.keys())
+
+    # print(cnv.attrs['LATITUDE'])
+    # print(cnv["LATITUDE"])
+
+    # print(type(cnv.as_DataFrame()))
+    # df = cnv.as_DataFrame()
+    # print(df.head())
+
+    if 'TEMP' in cnv.keys():
+        print("Found TEMP!")
+
+    cnv.add_depth(pressure_key="PRES", lat_key="LATITUDE")
+
+    if 'depth' in cnv.keys():
+        print("Found depth!")
+        print(cnv["depth"])
+
+    os.chdir(root)
+
+
+if __name__ == "__main__":
+    
+    main("What is going on?")
